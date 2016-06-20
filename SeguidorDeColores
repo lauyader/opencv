@@ -1,0 +1,87 @@
+# -*- coding: utf-8 -*-
+
+# SCRIPT DE SEGUIMIENTO DE OBJETOS POR COLOR
+# El script detecta objetos en base a colores y selecciona el más grande
+# (por área). Se calcula la distancia del centroide del objeto al centro
+# de la imagen.
+
+# Por David Escobar, Ángel Moreno, Eduardo Rivas
+# para la Universidad Don Bosco - Ciclo 2 - 2014
+
+# Desarrollado en Python 2.7, OpenCV 2.4.8, Ubuntu 14.04
+
+# Importar las librerías OpenCV y Numpy
+import cv2
+import numpy as np
+
+# Ancho y alto del video que se desea capturar
+frame_w = 640
+frame_h = 480
+# Coordenadas del centro del video
+fcx = int(frame_w/2)
+fcy = int(frame_h/2)
+# Indices de las propiedades de video (no editar)
+FRAME_PROP_WIDTH = 3
+FRAME_PROP_HEIGHT = 4
+# Definir rango de color a identificar (HSV)
+lower_color = np.array([90, 90, 90], dtype=np.uint8)
+upper_color = np.array([120, 255, 255], dtype=np.uint8)
+
+# Iniciar captura de video con el tamaño deseado
+cap = cv2.VideoCapture(0)
+cap.set(FRAME_PROP_WIDTH, frame_w)
+cap.set(FRAME_PROP_HEIGHT, frame_h)
+
+# Repetir mientras halla señal de video
+while cap.isOpened():
+
+    # Leer un frame
+    _, img = cap.read()
+    # Aplicar desenfoque para eliminar ruido
+    frame = cv2.blur(img, (15, 15))
+    # Convertir frame de BRG a HSV
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    # Aplicar umbral a la imagen y extraer los pixeles en el rango de colores
+    thresh = cv2.inRange(hsv, lower_color, upper_color)
+    # Encontrar los contornos en la imagen extraída
+    cnts, h = cv2.findContours(thresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Encontrar el contorno de mayor área y especificarlo como best_cnt
+    max_area = 0
+    for cnt in cnts:
+        area = cv2.contourArea(cnt)
+        if area > max_area:
+            max_area = area
+            best_cnt = cnt
+
+    # Ejecutar este bloque solo si se encontró un área
+    if max_area > 0:
+        # Encontrar el centroide del mejor contorno y marcarlo
+        M = cv2.moments(best_cnt)
+        cx, cy = int(M['m10']/M['m00']), int(M['m01']/M['m00'])
+        cv2.circle(img, (cx, cy), 5, 255, -1)
+        # Dibujar un rectángulo alrdedor del objeto
+        x, y, w, h = cv2.boundingRect(best_cnt)
+        cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        # Dibujar una línea del centro del frame al centroide
+        cv2.line(img, (cx, cy), (fcx, fcy), 255, 2)
+        # Calcular el error en X y Y y mostrarlo como texto
+        errx = fcx - cx
+        erry = fcy - cy
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        cv2.putText(img, str(errx), (30, 30), font, 0.8, 255, 2, 8)
+        cv2.putText(img, str(erry), (120, 30), font, 0.8, 244, 2, 8)
+
+    # Mostrar la imagen original con todos los overlays
+    cv2.imshow('img', img)
+    # Mostrar la máscara con los pixeles extraídos
+    cv2.imshow('thresh', thresh)
+
+    # Salir del bucle si se presiona ESC
+    k = cv2.waitKey(5) & 0xFF
+    if k == 27:
+        break
+
+# Limpieza y fin de programa
+cap.release()
+cv2.destroyAllWindows()
